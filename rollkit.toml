@@ -1,0 +1,4 @@
+entrypoint = "/Users/ybratashchuk/wordle/cmd/wordled/main.go"
+
+[chain]
+  config_dir = "/Users/ybratashchuk/.wordle"

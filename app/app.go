@@ -6,6 +6,8 @@ import (
 
 	ante "wordle/app/ante"
 
+	relay "wordle/pkg/ibc/relay"
+
 	authante "github.com/cosmos/cosmos-sdk/x/auth/ante"
 
 	_ "cosmossdk.io/api/cosmos/tx/config/v1" // import for side-effects
@@ -138,6 +140,7 @@ type App struct {
 	ICAControllerKeeper icacontrollerkeeper.Keeper
 	ICAHostKeeper       icahostkeeper.Keeper
 	TransferKeeper      ibctransferkeeper.Keeper
+	IBCRelayHandler     *relay.RelayHandler
 
 	// Scoped IBC
 	ScopedIBCKeeper           capabilitykeeper.ScopedKeeper

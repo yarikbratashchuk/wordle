@@ -1,6 +1,9 @@
 package app
 
 import (
+	"time"
+	relay "wordle/pkg/ibc/relay"
+
 	"cosmossdk.io/core/appmodule"
 	storetypes "cosmossdk.io/store/types"
 	cdctypes "github.com/cosmos/cosmos-sdk/codec/types"
@@ -14,10 +17,8 @@ import (
 	capabilitykeeper "github.com/cosmos/ibc-go/modules/capability/keeper"
 	capabilitytypes "github.com/cosmos/ibc-go/modules/capability/types"
 	icamodule "github.com/cosmos/ibc-go/v8/modules/apps/27-interchain-accounts"
-	icacontroller "github.com/cosmos/ibc-go/v8/modules/apps/27-interchain-accounts/controller"
 	icacontrollerkeeper "github.com/cosmos/ibc-go/v8/modules/apps/27-interchain-accounts/controller/keeper"
 	icacontrollertypes "github.com/cosmos/ibc-go/v8/modules/apps/27-interchain-accounts/controller/types"
-	icahost "github.com/cosmos/ibc-go/v8/modules/apps/27-interchain-accounts/host"
 	icahostkeeper "github.com/cosmos/ibc-go/v8/modules/apps/27-interchain-accounts/host/keeper"
 	icahosttypes "github.com/cosmos/ibc-go/v8/modules/apps/27-interchain-accounts/host/types"
 	icatypes "github.com/cosmos/ibc-go/v8/modules/apps/27-interchain-accounts/types"
@@ -93,6 +94,11 @@ func (app *App) registerIBCModules(appOpts servertypes.AppOptions) error {
 	govRouter := govv1beta1.NewRouter()
 	govRouter.AddRoute(govtypes.RouterKey, govv1beta1.ProposalHandler)
 
+	// Timeout is set to 6 seconds to allow for some buffer, in real life this
+	// should be dynamic based on chain performance and network conditions, or
+	// taken from the IBC channel config
+	app.IBCRelayHandler = relay.NewRelayHandler(6 * time.Second)
+
 	app.IBCFeeKeeper = ibcfeekeeper.NewKeeper(
 		app.appCodec, app.GetKey(ibcfeetypes.StoreKey),
 		app.IBCKeeper.ChannelKeeper, // may be replaced with IBC middleware
@@ -142,17 +148,13 @@ func (app *App) registerIBCModules(appOpts servertypes.AppOptions) error {
 	)
 	app.GovKeeper.SetLegacyRouter(govRouter)
 
-	// Create IBC modules with ibcfee middleware
-	transferIBCModule := ibcfee.NewIBCMiddleware(ibctransfer.NewIBCModule(app.TransferKeeper), app.IBCFeeKeeper)
+	// Create IBC modules with relay middleware
+	transferIBCModule := relay.NewRelayMiddleware(app.IBCRelayHandler)
 
 	// integration point for custom authentication modules
-	var noAuthzModule porttypes.IBCModule
-	icaControllerIBCModule := ibcfee.NewIBCMiddleware(
-		icacontroller.NewIBCMiddleware(noAuthzModule, app.ICAControllerKeeper),
-		app.IBCFeeKeeper,
-	)
+	icaControllerIBCModule := relay.NewRelayMiddleware(app.IBCRelayHandler)
 
-	icaHostIBCModule := ibcfee.NewIBCMiddleware(icahost.NewIBCModule(app.ICAHostKeeper), app.IBCFeeKeeper)
+	icaHostIBCModule := relay.NewRelayMiddleware(app.IBCRelayHandler)
 
 	// Create static IBC router, add transfer route, then set and seal it
 	ibcRouter := porttypes.NewRouter().

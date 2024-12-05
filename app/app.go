@@ -1,7 +1,12 @@
 package app
 
 import (
+	"fmt"
 	"io"
+
+	ante "wordle/app/ante"
+
+	authante "github.com/cosmos/cosmos-sdk/x/auth/ante"
 
 	_ "cosmossdk.io/api/cosmos/tx/config/v1" // import for side-effects
 	clienthelpers "cosmossdk.io/client/v2/helpers"
@@ -258,6 +263,13 @@ func New(
 	// build app
 	app.App = appBuilder.Build(db, traceStore, baseAppOptions...)
 
+	// Helper function to create and set the ante handler
+	anteHandler, err := app.setupAnteHandler()
+	if err != nil {
+		return nil, err
+	}
+	app.SetAnteHandler(anteHandler)
+
 	// register legacy modules
 	if err := app.registerIBCModules(appOpts); err != nil {
 		return nil, err
@@ -417,4 +429,22 @@ func BlockedAddresses() map[string]bool {
 		}
 	}
 	return result
+}
+
+// Helper function to create and set the ante handler
+func (app *App) setupAnteHandler() (sdk.AnteHandler, error) {
+	anteHandler, err := ante.NewAnteHandler(
+		ante.HandlerOptions{
+			AccountKeeper:   app.AccountKeeper,
+			BankKeeper:      app.BankKeeper,
+			SignModeHandler: app.txConfig.SignModeHandler(),
+			FeegrantKeeper:  app.FeeGrantKeeper,
+			SigGasConsumer:  authante.DefaultSigVerificationGasConsumer,
+		},
+	)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create ante handler: %w", err)
+	}
+
+	return anteHandler, nil
 }

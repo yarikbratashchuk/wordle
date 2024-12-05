@@ -1,0 +1,30 @@
+syntax = "proto3";
+
+package wordle.wordle;
+
+import "amino/amino.proto";
+import "gogoproto/gogo.proto";
+
+option go_package = "wordle/x/wordle/types";
+
+// BlockState tracks the state changes within a block
+message BlockState {
+    int64 height = 1;
+    repeated string validators = 2;
+    map<string, bool> votes = 3;
+    repeated StateChange changes = 4;
+}
+
+// StateChange represents a single state modification
+message StateChange {
+    bytes key = 1;
+    bytes value = 2;
+    bool is_deleted = 3;
+}
+
+// ConsensusInfo tracks voting information
+message ConsensusInfo {
+    int32 total_validators = 1;
+    int32 voted_yes = 2;
+    int64 height = 3;
+}

@@ -144,14 +144,44 @@ func (am AppModule) ExportGenesis(ctx sdk.Context, cdc codec.JSONCodec) json.Raw
 func (AppModule) ConsensusVersion() uint64 { return 1 }
 
 // BeginBlock contains the logic that is automatically triggered at the beginning of each block.
-// The begin block implementation is optional.
-func (am AppModule) BeginBlock(_ context.Context) error {
+func (am AppModule) BeginBlock(ctx context.Context) error {
+	sdkCtx := sdk.UnwrapSDKContext(ctx)
+
+	// Initialize consensus tracking for this block
+	info := types.ConsensusInfo{
+		Height:          sdkCtx.BlockHeight(),
+		TotalValidators: int32(len(sdkCtx.VoteInfos())),
+		VotedYes:        0,
+	}
+
+	if err := am.keeper.SaveConsensusInfo(ctx, info); err != nil {
+		panic(err)
+	}
+
+	return nil
+}
+
+// FinalizeBlock contains the logic that processes transactions and updates state
+func (am AppModule) FinalizeBlock(ctx sdk.Context) error {
+	// Check if we have consensus
+	if !am.keeper.CheckConsensus(ctx) {
+		// If no consensus, rollback state changes
+		if err := am.keeper.RollbackState(ctx); err != nil {
+			return err
+		}
+		return nil
+	}
+
+	// If we have consensus, commit the state
+	if err := am.keeper.CommitState(ctx); err != nil {
+		return err
+	}
+
 	return nil
 }
 
 // EndBlock contains the logic that is automatically triggered at the end of each block.
-// The end block implementation is optional.
-func (am AppModule) EndBlock(_ context.Context) error {
+func (am AppModule) EndBlock(ctx context.Context) error {
 	return nil
 }
 
